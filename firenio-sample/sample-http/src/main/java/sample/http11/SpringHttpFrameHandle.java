@@ -15,13 +15,11 @@
  */
 package sample.http11;
 
-import org.springframework.context.support.ClassPathXmlApplicationContext;
-
 import com.firenio.codec.http11.HttpFrame;
+import com.firenio.component.Channel;
 import com.firenio.component.ChannelContext;
 import com.firenio.component.Frame;
-import com.firenio.component.Channel;
-
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 import sample.http11.service.ContextUtil;
 
 public class SpringHttpFrameHandle extends HttpFrameHandle {
@@ -60,8 +58,8 @@ public class SpringHttpFrameHandle extends HttpFrameHandle {
     }
 
     @Override
-    public void initialize(ChannelContext context, String rootPath, String mode) throws Exception {
-        super.initialize(context, rootPath, mode);
+    public void initialize(ChannelContext context, String rootPath, boolean prodMode) throws Exception {
+        super.initialize(context, rootPath, prodMode);
         System.setProperty("org.apache.commons.logging.log", Sl4jLogger.class.getName());
         Thread.currentThread().setContextClassLoader(null); //for spring
         applicationContext = new ClassPathXmlApplicationContext("classpath:spring-core.xml");

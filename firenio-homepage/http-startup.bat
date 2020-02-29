@@ -15,7 +15,7 @@ cd ..\..\firenio-homepage
 
 java -XX:+PrintGCDetails -Xloggc:gc.log ^
      -cp ./lib/*; ^
-     -Dboot.mode=prod ^
+     -Dboot.prodMode=prod ^
      -Dboot.libPath=/app/lib ^
-     -Dboot.class=sample.http11.startup.TestHttpBootstrapEngine ^
+     -Dboot.className=sample.http11.startup.TestHttpBootstrapEngine ^
      com.firenio.container.Bootstrap

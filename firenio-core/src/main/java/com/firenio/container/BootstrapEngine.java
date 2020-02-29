@@ -20,5 +20,5 @@ package com.firenio.container;
  */
 public interface BootstrapEngine {
 
-    void bootstrap(String rootPath, String mode) throws Exception;
+    void bootstrap(String rootPath, boolean prodMode) throws Exception;
 }

@@ -48,7 +48,7 @@ public abstract class ProtocolCodec {
             }
             if (className != null) {
                 try {
-                    clazz = Class.forName(sts[3].getClassName());
+                    clazz = Class.forName(sts[3].getClassName(), false, ProtocolCodec.class.getClassLoader());
                 } catch (ClassNotFoundException e) {
                 }
             }

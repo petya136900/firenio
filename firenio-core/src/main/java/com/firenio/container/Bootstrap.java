@@ -15,121 +15,106 @@
  */
 package com.firenio.container;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
 import com.firenio.common.Assert;
 import com.firenio.common.FileUtil;
 import com.firenio.common.Util;
 import com.firenio.log.DebugUtil;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author wangkai
  */
 public class Bootstrap {
 
-    public static final String BOOT_CLASS    = "boot.class";
-    public static final String BOOT_LIB_PATH = "boot.libPath";
-    public static final String BOOT_MODE     = "boot.mode";
-    public static final String RUNTIME_DEV   = "dev";
-    public static final String RUNTIME_PROD  = "prod";
-
-    public static boolean isRuntimeDevMode(String mode) {
-        return RUNTIME_DEV.equalsIgnoreCase(mode);
-    }
-
-    public static boolean isRuntimeProdMode(String mode) {
-        return RUNTIME_PROD.equalsIgnoreCase(mode);
-    }
+    private boolean            prodMode;
+    private String             rootPath;
+    private DynamicClassLoader classLoader;
+    private String             bootClassName;
+    private boolean            checkDuplicate;
+    private List<String>       notEntrustPackageList;
+    private List<String>       libPaths = new ArrayList<>();
 
     public static void main(String[] args) throws Exception {
-        String libPath = Util.getStringProperty(BOOT_LIB_PATH, "/app");
-        startup(System.getProperty(BOOT_CLASS), libPath);
+        String bootClassName = Util.getStringProperty("boot.className");
+        String libPath = Util.getStringProperty("boot.libPath");
+        Bootstrap bootstrap = new Bootstrap();
+        bootstrap.setBootClassName(bootClassName);
+        bootstrap.setCheckDuplicate(false);
+        bootstrap.setProdMode(true);
+        bootstrap.addRelativeLibPath("/conf");
+        bootstrap.addRelativeLibPath(libPath);
+        bootstrap.startup();
     }
 
-    private static URLDynamicClassLoader newClassLoader(ClassLoader parent, String mode, boolean entrustFirst, String rootLocalAddress, List<ClassPathScanner> classPathScanners) throws IOException {
-        //这里需要设置优先委托自己加载class，因为到后面对象需要用该classloader去加载resources
-        URLDynamicClassLoader classLoader = new URLDynamicClassLoader(parent, entrustFirst);
-        classLoader.addMatchExtend(BootstrapEngine.class.getName());
-        if (classPathScanners == null || classPathScanners.size() == 0) {
-            throw new IOException("null classPathScanners");
+    public Bootstrap() {
+        this.rootPath = FileUtil.getCurrentPath();
+    }
+
+    public void startup() throws Exception {
+        Assert.notNull(bootClassName, "className");
+        DebugUtil.getLogger().info("PROD_MODE: {}", prodMode);
+        DebugUtil.getLogger().info("ROOT_PATH: {}", rootPath);
+        DynamicClassLoader classLoader = new DynamicClassLoader(notEntrustPackageList, checkDuplicate);
+        for (String libPath : libPaths) {
+            DebugUtil.getLogger().info("CLS_PATH: {}", libPath);
+            classLoader.scan(libPath);
         }
-        for (ClassPathScanner scaner : classPathScanners) {
-            if (scaner == null) {
-                continue;
-            }
-            scaner.scanClassPaths(classLoader, mode, rootLocalAddress);
-        }
+        Class bootClass = Class.forName(bootClassName, true, classLoader);
+        Thread.currentThread().setContextClassLoader(classLoader);
+        BootstrapEngine engine = (BootstrapEngine) bootClass.newInstance();
+        engine.bootstrap(rootPath, prodMode);
+    }
+
+    public boolean isProdMode() {
+        return prodMode;
+    }
+
+    public void setProdMode(boolean prodMode) {
+        this.prodMode = prodMode;
+    }
+
+    public void setBootClassName(String bootClassName) {
+        this.bootClassName = bootClassName;
+    }
+
+    public String getBootClassName() {
+        return bootClassName;
+    }
+
+    public DynamicClassLoader getClassLoader() {
         return classLoader;
     }
 
-    public static void startup(String className, List<ClassPathScanner> cpScaners) throws Exception {
-        Assert.notNull(className, "className");
-        Assert.notNull(cpScaners, "cpScaners");
-        String mode     = Util.getStringProperty(BOOT_MODE, "dev");
-        String rootPath = FileUtil.getCurrentClassPath();
-        DebugUtil.getLogger().info("RUNTIME_MODE: {}", mode);
-        DebugUtil.getLogger().info("ROOT_PATH: {}", rootPath);
-        boolean     isDevMode   = isRuntimeDevMode(mode);
-        ClassLoader parent      = Bootstrap.class.getClassLoader();
-        ClassLoader classLoader = newClassLoader(parent, mode, isDevMode, rootPath, cpScaners);
-        Class<?>    bootClass   = classLoader.loadClass(className);
-        Thread.currentThread().setContextClassLoader(classLoader);
-        BootstrapEngine engine = (BootstrapEngine) bootClass.newInstance();
-        engine.bootstrap(rootPath, mode);
+    public String getRootPath() {
+        return rootPath;
     }
 
-    public static void startup(final String bootClass, final String libPath) throws Exception {
-        startup(bootClass, withDefault(new ClassPathScanner() {
-
-            @Override
-            public void scanClassPaths(URLDynamicClassLoader classLoader, String mode, String rootLocalAddress) throws IOException {
-                if (!isRuntimeDevMode(mode)) {
-                    String path = rootLocalAddress + libPath;
-                    DebugUtil.getLogger().info("CLS_PATH: {}", path);
-                    classLoader.scan(path);
-                }
-            }
-        }));
+    public void addLibPath(String path) {
+        libPaths.add(path);
     }
 
-    public static List<ClassPathScanner> withDefault() {
-        return withDefault(new ClassPathScanner[0]);
+    public void addRelativeLibPath(String path) {
+        libPaths.add(getRootPath() + path);
     }
 
-    public static List<ClassPathScanner> withDefault(ClassPathScanner... scanners) {
-        List<ClassPathScanner> classPathScanners = new ArrayList<>();
-        classPathScanners.add(new DefaultClassPathScanner());
-        if (scanners != null) {
-            for (ClassPathScanner scanner : scanners) {
-                if (scanner == null) {
-                    continue;
-                }
-                classPathScanners.add(scanner);
-            }
-        }
-        return classPathScanners;
+    public void setNotEntrustPackageList(List<String> notEntrustPackageList) {
+        this.notEntrustPackageList = notEntrustPackageList;
     }
 
-    public interface ClassPathScanner {
-        void scanClassPaths(URLDynamicClassLoader classLoader, String mode, String rootPath) throws IOException;
+    public List<String> getNotEntrustPackageList() {
+        return notEntrustPackageList;
     }
 
-    static class DefaultClassPathScanner implements ClassPathScanner {
+    public void setCheckDuplicate(boolean checkDuplicate) {
+        this.checkDuplicate = checkDuplicate;
+    }
 
-        @Override
-        public void scanClassPaths(URLDynamicClassLoader classLoader, String mode, String rootPath) throws IOException {
-            String path = null;
-            if (isRuntimeDevMode(mode)) {
-                classLoader.addExcludePath("/app");
-                path = rootPath;
-            } else {
-                path = rootPath + "/conf";
-            }
-            DebugUtil.getLogger().info("CLS_PATH: {}", path);
-            classLoader.scan(path);
-        }
+    public boolean isCheckDuplicate() {
+        return checkDuplicate;
     }
 
 }
