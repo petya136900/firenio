@@ -42,19 +42,15 @@ public class FileUtil {
     private static final byte[] SKIP_BYTE_BUFFER = new byte[2048];
 
     public static void cleanDirectory(File directory) {
-        if (!directory.exists()) {
-            return;
-        }
-        if (directory.isDirectory()) {
-            File[] files = directory.listFiles();
-            if (files == null) {
-                directory.delete();
-                return;
+        if (directory.exists()) {
+            if (directory.isDirectory()) {
+                File[] files = directory.listFiles();
+                if (files != null) {
+                    for (File file : files) {
+                        cleanDirectory(file);
+                    }
+                }
             }
-            for (File file : files) {
-                cleanDirectory(file);
-            }
-        } else {
             directory.delete();
         }
     }
@@ -552,7 +548,6 @@ public class FileUtil {
 
     public static void writeByFile(File file, String content) throws IOException {
         writeByFile(file, content, ENCODING, false);
-
     }
 
     public static void writeByFile(File file, String data, boolean append) throws IOException {
@@ -564,7 +559,7 @@ public class FileUtil {
     }
 
     public static void writeByFile(File file, String content, Charset encoding, boolean append) throws IOException {
-        write(content.getBytes(encoding), openOutputStream(file, append));
+        writeByFile(file, content.getBytes(encoding), append);
     }
 
     public static void writePropertiesByCls(java.util.Properties properties, String file) throws IOException {
