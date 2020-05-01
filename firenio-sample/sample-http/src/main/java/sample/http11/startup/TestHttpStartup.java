@@ -18,9 +18,6 @@ package sample.http11.startup;
 import com.firenio.common.Util;
 import com.firenio.container.Bootstrap;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * @author wangkai
  */

@@ -58,6 +58,7 @@ public class HttpCodec extends ProtocolCodec {
     protected final int        hlimit;
     protected final int        fcache;
     protected final boolean    lite;
+    protected final int        cthreshold;
     protected final ByteBuffer cl_buf;
     protected final ByteTree   cached_urls;
 
@@ -78,18 +79,19 @@ public class HttpCodec extends ProtocolCodec {
     }
 
     public HttpCodec(String server, int frameCache, boolean lite) {
-        this(server, frameCache, 1024 * 8, 1024 * 256, lite, null);
+        this(server, frameCache, 1024 * 8, 1024 * 256, 1024 * 64, lite, null);
     }
 
     public HttpCodec(String server, int frameCache, boolean lite, ByteTree cachedUrls) {
-        this(server, frameCache, 1024 * 8, 1024 * 256, lite, cachedUrls);
+        this(server, frameCache, 1024 * 8, 1024 * 256, 1024 * 64, lite, cachedUrls);
     }
 
-    public HttpCodec(String server, int fcache, int hlimit, int blimit, boolean lite, ByteTree cachedUrls) {
+    public HttpCodec(String server, int fcache, int hlimit, int blimit, int cthreshold, boolean lite, ByteTree cachedUrls) {
         this.lite = lite;
         this.hlimit = hlimit;
         this.blimit = blimit;
         this.fcache = fcache;
+        this.cthreshold = cthreshold;
         this.cached_urls = cachedUrls;
         ByteBuffer temp = ByteBuffer.allocate(128);
         if (server == null) {
@@ -473,7 +475,7 @@ public class HttpCodec extends ProtocolCodec {
             }
         }
         len += 2;
-        if (is_array) {
+        if (write_size <= cthreshold) {
             len += write_size;
         }
         ByteBuf buf;
@@ -500,13 +502,23 @@ public class HttpCodec extends ProtocolCodec {
         }
         buf.writeByte(R);
         buf.writeByte(N);
-        if (is_array) {
-            buf.writeBytes(content_array);
-            return buf;
-        } else {
+        if (write_size > cthreshold) {
             ch.write(buf);
-            ch.write(content_buf);
+            if (is_array) {
+                ch.write(ByteBuf.wrap(content_array));
+            } else {
+                ch.write(content_buf);
+            }
             return null;
+        } else {
+            if (write_size > 0) {
+                if (is_array) {
+                    buf.writeBytes(content_array);
+                } else {
+                    buf.writeBytes(content_buf);
+                }
+            }
+            return buf;
         }
     }
 

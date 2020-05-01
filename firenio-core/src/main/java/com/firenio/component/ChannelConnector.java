@@ -267,7 +267,9 @@ public final class ChannelConnector extends ChannelContext implements Closeable 
         @Override
         void channelEstablish(Channel ch, Throwable ex) {
             if (ex != null) {
-                selectionKey.cancel();
+                if (selectionKey != null) {
+                    selectionKey.cancel();
+                }
                 Util.close(javaChannel);
             }
         }

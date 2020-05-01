@@ -258,14 +258,14 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     }
 
     /**
-     * Allocate a ByteBuf with 1 byte(in fact a memory unit) and skip header length(write).
+     * Allocate a ByteBuf with n(a memory unit) byte
      */
     public ByteBuf allocate() {
         return allocate(1);
     }
 
     /**
-     * Allocate a ByteBuf with n byte(in fact a memory unit) and skip header length(write).
+     * Allocate a ByteBuf with n((n+unit-1)/unit*unit) byte
      */
     public ByteBuf allocate(int limit) {
         return alloc().allocate(limit);
@@ -273,7 +273,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
 
     public ByteBuf allocateWithSkipHeader(int limit) {
         int h = codec.getHeaderLength();
-        return alloc().allocate(h + limit).skipWrite(h);
+        return allocate(h + limit).skipWrite(h);
     }
 
     /**

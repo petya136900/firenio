@@ -73,7 +73,7 @@ public class TestHttpBootstrapEngine implements BootstrapEngine {
         DevelopConfig.CHANNEL_DEBUG = true;
         Options.setEnableEpoll(true);
         Options.setEnableUnsafe(true);
-        Options.setEnableOpenssl(false);
+        Options.setEnableOpenssl(true);
         Options.setBufThreadYield(true);
         Options.setDebugError(true);
         //        Options.setEnableUnsafeBuf(true);
