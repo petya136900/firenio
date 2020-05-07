@@ -16,8 +16,8 @@
 package test.others;
 
 import com.firenio.common.Util;
-import com.firenio.container.Bootstrap;
-import com.firenio.container.BootstrapEngine;
+import com.firenio.boot.Bootstrap;
+import com.firenio.boot.BootstrapEngine;
 import com.firenio.log.Logger;
 import com.firenio.log.LoggerFactory;
 

@@ -16,7 +16,7 @@
 package sample.http11.startup;
 
 import com.firenio.common.Util;
-import com.firenio.container.Bootstrap;
+import com.firenio.boot.Bootstrap;
 
 /**
  * @author wangkai
