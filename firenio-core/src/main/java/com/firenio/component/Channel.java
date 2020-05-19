@@ -62,8 +62,9 @@ import static com.firenio.common.Util.unknownStackTrace;
 //请勿使用remote.getRemoteHost(),可能出现阻塞
 public abstract class Channel extends AttributeMap implements Runnable, AutoCloseable {
 
-    static final long   PENDING_WRITE_SIZE_OFFSET = Unsafe.fieldOffset(Channel.class, "pending_write_size");
-    static final Logger logger                    = NEW_LOGGER();
+    static final Logger                          logger                     = NEW_LOGGER();
+    static final long                            PENDING_WRITE_SIZE_OFFSET  = Unsafe.fieldOffset(Channel.class, "pending_write_size");
+    static final AtomicLongFieldUpdater<Channel> PENDING_WRITE_SIZE_UPDATER = PENDING_WRITE_SIZE_UPDATER();
 
     public static final SSLException NOT_TLS               = NOT_TLS();
     public static final IOException  CLOSED_CHANNEL        = CLOSED_CHANNEL();
@@ -1058,7 +1059,11 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     }
 
     long inc_pending_write_size(long size) {
-        return Unsafe.addAndGetLong(this, PENDING_WRITE_SIZE_OFFSET, size);
+        if (Unsafe.UNSAFE_AVAILABLE) {
+            return Unsafe.addAndGetLong(this, PENDING_WRITE_SIZE_OFFSET, size);
+        } else {
+            return PENDING_WRITE_SIZE_UPDATER.addAndGet(this, size);
+        }
     }
 
     @Override
