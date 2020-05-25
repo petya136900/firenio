@@ -311,7 +311,7 @@ public class HttpFrame extends Frame {
             setConnection(HttpConnection.UPGRADE);
             setResponseHeader(Upgrade, HttpStatic.websocket_bytes);
             setResponseHeader(Sec_WebSocket_Accept, acceptKey.getBytes());
-            ((HttpAttachment) ch.getAttachment()).setWebsocketFrameName(getFrameName());
+            ((HttpAttachment) ch.getAttachment()).setWebSocketFrameName(getFrameName());
             ByteBuf buf = ch.encode(this);
             ch.setCodec(WebSocketCodec.PROTOCOL_ID);
             ch.writeAndFlush(buf);

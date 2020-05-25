@@ -123,7 +123,13 @@ public class TestHttpBootstrapEngine implements BootstrapEngine {
         int port = properties.getIntegerProperty("server.port", defaultPort);
         context.setPort(port);
         context.setSslContext(sslContext);
-        context.bind();
+        try {
+            context.bind();
+        } catch (Exception e) {
+            HttpDateUtil.stop();
+            group.stop();
+            throw e;
+        }
         this.group = group;
         this.context = context;
         if (properties.getBooleanProperty("app.proxy")) {

@@ -52,6 +52,7 @@ public class HttpCodec extends ProtocolCodec {
     protected static final byte                        SPACE                 = ' ';
     protected static final int                         NUM_GET               = ByteUtil.getIntLE("GET ".getBytes(), 0);
     protected static final int                         NUM_POST              = ByteUtil.getIntLE("POST".getBytes(), 0);
+    protected static final int                         NUM_HEAD              = ByteUtil.getIntLE("HEAD ".getBytes(), 0);
 
     protected final int        blimit;
     protected final byte[][]   cl_bytes = new byte[1024][];
@@ -251,6 +252,9 @@ public class HttpCodec extends ProtocolCodec {
                 } else if (num == NUM_POST) {
                     f.setMethod(HttpMethod.POST);
                     url_start += 5;
+                } else if (num == NUM_HEAD) {
+                    f.setMethod(HttpMethod.HEAD);
+                    url_start += 5;
                 } else {
                     throw ILLEGAL_METHOD;
                 }
@@ -374,7 +378,7 @@ public class HttpCodec extends ProtocolCodec {
     public Frame decode(Channel ch, ByteBuf src) throws Exception {
         boolean        remove = false;
         HttpAttachment att    = (HttpAttachment) ch.getAttachment();
-        HttpFrame      f      = att.getUncompleteFrame();
+        HttpFrame      f      = att.getUncompletedFrame();
         if (f == null) {
             f = alloc_frame(ch.getEventLoop());
         } else {
@@ -391,12 +395,12 @@ public class HttpCodec extends ProtocolCodec {
         }
         if (decode_state == decode_state_complete) {
             if (remove) {
-                att.setUncompleteFrame(null);
+                att.setUncompletedFrame(null);
             }
             return f;
         } else {
             f.setDecodeState(decode_state);
-            att.setUncompleteFrame(f);
+            att.setUncompletedFrame(f);
             return null;
         }
     }
@@ -649,6 +653,9 @@ public class HttpCodec extends ProtocolCodec {
             parse_url(f, 4, line);
         } else if (v == NUM_POST) {
             f.setMethod(HttpMethod.POST);
+            parse_url(f, 5, line);
+        } else if (v == NUM_HEAD) {
+            f.setMethod(HttpMethod.HEAD);
             parse_url(f, 5, line);
         } else {
             throw ILLEGAL_METHOD;

@@ -20,7 +20,6 @@ import com.firenio.component.Channel;
 import com.firenio.component.ChannelContext;
 import com.firenio.component.Frame;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
-import sample.http11.service.ContextUtil;
 
 public class SpringHttpFrameHandle extends HttpFrameHandle {
 
@@ -32,7 +31,7 @@ public class SpringHttpFrameHandle extends HttpFrameHandle {
     public void accept(Channel ch, Frame f) throws Exception {
         if (checkFilter) {
             checkFilter = false;
-            filter = (HttpFrameFilter) ContextUtil.getBean("http-filter");
+            filter = (HttpFrameFilter) applicationContext.getBean("http-filter");
         }
         if (filter != null && filter.accept(ch, f)) {
             return;
@@ -54,7 +53,7 @@ public class SpringHttpFrameHandle extends HttpFrameHandle {
     }
 
     private HttpFrameAcceptor getFrameAcceptor(String name) {
-        return (HttpFrameAcceptor) ContextUtil.getBean(name);
+        return (HttpFrameAcceptor) applicationContext.getBean(name);
     }
 
     @Override
