@@ -82,15 +82,20 @@ public abstract class ProtocolCodec {
         throw new UnsupportedOperationException();
     }
 
-    public abstract String getProtocolId();
+    public String getProtocolId() {
+        return "Codec";
+    }
 
-    public abstract int getHeaderLength();
+    public int getHeaderLength() {
+        return 0;
+    }
 
     protected Object newAttachment() {
         return null;
     }
 
-    public void release(NioEventLoop eventLoop, Frame frame) {}
+    public void release(NioEventLoop eventLoop, Frame frame) {
+    }
 
     protected void flush_ping(Channel ch) {
         ByteBuf buf = getPingBuf();
