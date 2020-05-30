@@ -34,6 +34,7 @@ import com.firenio.concurrent.RingSequence;
 public class NioEventLoopGroup extends EventLoopGroup {
 
     static final long MAX_MEMORY_CAPACITY = 1L + Integer.MAX_VALUE - 64;
+    static final long NOT_IDLE_TIME       = 1000L * 60 * 60 * 24 * 365 * 30;
 
     private final boolean               acceptor;
     private       ByteBufAllocatorGroup allocatorGroup;
@@ -180,6 +181,11 @@ public class NioEventLoopGroup extends EventLoopGroup {
 
     public void setIdleTime(long idleTime) {
         checkNotRunning();
+        if (idleTime < 1) {
+            idleTime = NOT_IDLE_TIME;
+        } else {
+            idleTime = Math.min(idleTime, NOT_IDLE_TIME);
+        }
         this.idleTime = idleTime;
     }
 
