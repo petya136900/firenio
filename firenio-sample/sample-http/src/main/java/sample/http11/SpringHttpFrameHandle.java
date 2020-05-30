@@ -24,16 +24,11 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 public class SpringHttpFrameHandle extends HttpFrameHandle {
 
     private ClassPathXmlApplicationContext applicationContext;
-    private boolean                        checkFilter = true;
     private HttpFrameFilter                filter;
 
     @Override
     public void accept(Channel ch, Frame f) throws Exception {
-        if (checkFilter) {
-            checkFilter = false;
-            filter = (HttpFrameFilter) applicationContext.getBean("http-filter");
-        }
-        if (filter != null && filter.accept(ch, f)) {
+        if (filter.accept(ch, f)) {
             return;
         }
         String            frameName = HttpUtil.getFrameName(ch, f);
@@ -53,7 +48,11 @@ public class SpringHttpFrameHandle extends HttpFrameHandle {
     }
 
     private HttpFrameAcceptor getFrameAcceptor(String name) {
-        return (HttpFrameAcceptor) applicationContext.getBean(name);
+        try {
+            return (HttpFrameAcceptor) applicationContext.getBean(name);
+        }catch (Exception e){
+            return null;
+        }
     }
 
     @Override
@@ -63,6 +62,7 @@ public class SpringHttpFrameHandle extends HttpFrameHandle {
         Thread.currentThread().setContextClassLoader(null); //for spring
         applicationContext = new ClassPathXmlApplicationContext("classpath:spring-core.xml");
         applicationContext.start();
+        filter = (HttpFrameFilter) applicationContext.getBean("http-filter");
     }
 
 }

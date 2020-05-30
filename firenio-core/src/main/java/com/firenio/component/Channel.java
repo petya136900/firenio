@@ -48,7 +48,6 @@ import com.firenio.concurrent.EventLoop;
 import com.firenio.log.Logger;
 import com.firenio.log.LoggerFactory;
 
-import static com.firenio.Develop.SSL_DEBUG;
 import static com.firenio.Develop.debugException;
 import static com.firenio.common.Util.unknownStackTrace;
 
@@ -66,16 +65,9 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     static final long                            PENDING_WRITE_SIZE_OFFSET  = Unsafe.fieldOffset(Channel.class, "pending_write_size");
     static final AtomicLongFieldUpdater<Channel> PENDING_WRITE_SIZE_UPDATER = PENDING_WRITE_SIZE_UPDATER();
 
-    public static final SSLException NOT_TLS               = NOT_TLS();
-    public static final IOException  CLOSED_CHANNEL        = CLOSED_CHANNEL();
-    public static final IOException  SSL_HANDSHAKE_FAILED  = SSL_HANDSHAKE_FAILED();
-    public static final int          SSL_PACKET_LIMIT      = 1024 * 64;
-    public static final SSLException SSL_PACKET_OVER_LIMIT = SSL_PACKET_OVER_LIMIT();
-    public static final SSLException SSL_UNWRAP_OVER_LIMIT = SSL_UNWRAP_OVER_LIMIT();
-    public static final SSLException SSL_UNWRAP_CLOSED     = SSL_UNWRAP_CLOSED();
-    public static final SSLException SSL_WRAP_CLOSED       = SSL_WRAP_CLOSED();
-    public static final SSLException SSL_UNWRAP_EXCEPTION  = SSL_UNWRAP_EXCEPTION();
-    public static final IOException  TASK_REJECT           = TASK_REJECT();
+    public static final IOException  CLOSED_CHANNEL       = CLOSED_CHANNEL();
+    public static final IOException  SSL_HANDSHAKE_FAILED = SSL_HANDSHAKE_FAILED();
+    public static final SSLException SSL_WRAP_CLOSED      = SSL_WRAP_CLOSED();
 
     protected final    ChannelContext context;
     protected final    long           creation_time = Util.now();
@@ -136,10 +128,6 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         return Util.unknownStackTrace(new SSLException("ssl handshake failed"), Channel.class, "ssl_handshake(...)");
     }
 
-    private static ClosedChannelException CLOSED_WHEN_FLUSH() {
-        return Util.unknownStackTrace(new ClosedChannelException(), Channel.class, "flush(...)");
-    }
-
     private static void fill_null(Object[] a, int fromIndex, int toIndex) {
         for (int i = fromIndex; i < toIndex; i++)
             a[i] = null;
@@ -149,32 +137,8 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         return LoggerFactory.getLogger(Channel.class);
     }
 
-    private static SSLException NOT_TLS() {
-        return Util.unknownStackTrace(new SSLException("not tls"), Channel.class, "isEnoughSslUnwrap()");
-    }
-
-    private static SSLException SSL_PACKET_OVER_LIMIT() {
-        return Util.unknownStackTrace(new SSLException("over writeIndex (" + SSL_PACKET_LIMIT + ")"), Channel.class, "isEnoughSslUnwrap()");
-    }
-
-    private static SSLException SSL_UNWRAP_CLOSED() {
-        return unknownStackTrace(new SSLException("SSL_UNWRAP_CLOSED"), Channel.class, "unwrap()");
-    }
-
     private static SSLException SSL_WRAP_CLOSED() {
         return unknownStackTrace(new SSLException("SSL_WRAP_CLOSED"), Channel.class, "wrap()");
-    }
-
-    private static SSLException SSL_UNWRAP_OVER_LIMIT() {
-        return unknownStackTrace(new SSLException("over writeIndex (SSL_UNWRAP_BUFFER_SIZE)"), Channel.class, "unwrap()");
-    }
-
-    private static SSLException SSL_UNWRAP_EXCEPTION() {
-        return unknownStackTrace(new SSLException("unwrap exception(enable debug to get detail)"), Channel.class, "unwrap()");
-    }
-
-    private static IOException TASK_REJECT() {
-        return Util.unknownStackTrace(new IOException(), Channel.class, "accept_reject(...)");
     }
 
     private static AtomicLongFieldUpdater<Channel> PENDING_WRITE_SIZE_UPDATER() {
@@ -187,68 +151,6 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
 
     public static AttributeKey valueOfKey(String name, AttributeInitFunction function) {
         return AttributeMap.valueOfKey(Channel.class, name, function);
-    }
-
-    protected void slice_remain_plain(ByteBuf src) {
-        //ensure the channel is open, otherwise the buf will never be released if the channel closed
-        if (isOpen()) {
-            plain_remain_buf = slice_remain(src);
-        }
-    }
-
-    private void slice_remain_ssl(ByteBuf src) {
-        if (isOpen()) {
-            ssl_remain_buf = slice_remain(src);
-        }
-    }
-
-    private void accept(ByteBuf src) throws Exception {
-        final Channel       ch         = this;
-        final ProtocolCodec codec      = getCodec();
-        final IoEventHandle handle     = getIoEventHandle();
-        final EventLoop     eel        = getExecutorEventLoop();
-        final boolean       enable_wel = eel != null;
-        for (; ; ) {
-            Frame f = codec.decode(ch, src);
-            if (f == null) {
-                codec.storePlainReadRemain(ch, src);
-                break;
-            }
-            if (enable_wel) {
-                accept_async(eel, f);
-            } else {
-                accept_line(handle, f);
-            }
-            if (!src.hasReadableBytes()) {
-                break;
-            }
-        }
-    }
-
-    private void accept_async(final EventLoop eel, final Frame f) {
-        final Runnable job = new Runnable() {
-
-            @Override
-            public void run() {
-                final Channel ch = Channel.this;
-                try {
-                    ch.getIoEventHandle().accept(ch, f);
-                } catch (Throwable e) {
-                    ch.getIoEventHandle().exceptionCaught(ch, f, e);
-                }
-            }
-        };
-        if (!eel.submit(job)) {
-            exception_caught(f, TASK_REJECT);
-        }
-    }
-
-    private void accept_line(IoEventHandle handle, Frame frame) {
-        try {
-            handle.accept(this, frame);
-        } catch (Throwable e) {
-            exception_caught(frame, e);
-        }
     }
 
     /**
@@ -346,16 +248,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         return codec.encode(this, frame);
     }
 
-    private void exception_caught(Frame frame, Throwable ex) {
-        try {
-            getIoEventHandle().exceptionCaught(this, frame, ex);
-        } catch (Throwable e) {
-            logger.error(ex.getMessage(), ex);
-            logger.error(e.getMessage(), e);
-        }
-    }
-
-    private void finish_handshake() {
+    protected void finish_handshake() {
         this.ssl_handshake_finished = true;
         this.fire_opened();
         this.context.channelEstablish(this, null);
@@ -537,68 +430,6 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         return enable_ssl;
     }
 
-    /**
-     * <pre>
-     * record type (1 byte)
-     * /
-     * /    version (1 byte major, 1 byte minor)
-     * /    /
-     * /    /         length (2 bytes)
-     * /    /         /
-     * +----+----+----+----+----+
-     * |    |    |    |    |    |
-     * |    |    |    |    |    | TLS Record header
-     * +----+----+----+----+----+
-     *
-     *
-     * Record Type Values       dec      hex
-     * -------------------------------------
-     * CHANGE_CIPHER_SPEC        20     0x14
-     * ALERT                     21     0x15
-     * HANDSHAKE                 22     0x16
-     * APPLICATION_DATA          23     0x17
-     *
-     *
-     * Version Values            dec     hex
-     * -------------------------------------
-     * SSL 3.0                   3,0  0x0300
-     * TLS 1.0                   3,1  0x0301
-     * TLS 1.1                   3,2  0x0302
-     * TLS 1.2                   3,3  0x0303
-     *
-     * ref:http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
-     * </pre>
-     */
-    private boolean isEnoughSslUnwrap(ByteBuf src) throws SSLException {
-        if (src.readableBytes() < 5) {
-            return false;
-        }
-        int pos = src.readIndex();
-        // TLS - Check ContentType
-        int type = src.getUnsignedByte(pos);
-        if (type < 20 || type > 23) {
-            throw NOT_TLS;
-        }
-        // TLS - Check ProtocolVersion
-        int majorVersion = src.getUnsignedByte(pos + 1);
-        int minorVersion = src.getUnsignedByte(pos + 2);
-        int packetLength = src.getUnsignedShort(pos + 3);
-        if (majorVersion != 3 || minorVersion < 1) {
-            // NOT TLS (i.e. SSLv2,3 or bad data)
-            throw NOT_TLS;
-        }
-        int len = packetLength + 5;
-        if (src.readableBytes() < len) {
-            return false;
-        }
-        if (len > SSL_PACKET_LIMIT) {
-            throw SSL_PACKET_OVER_LIMIT;
-        }
-        src.markWriteIndex();
-        src.writeIndex(pos + len);
-        return true;
-    }
-
     public boolean isOpen() {
         return open;
     }
@@ -624,82 +455,9 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     protected void read() throws Exception {
         last_access = Util.now();
         if (enable_ssl) {
-            read_ssl();
+            codec.read_ssl(this);
         } else {
-            read_plain();
-        }
-    }
-
-    private void read_plain() throws Exception {
-        final Channel       ch    = this;
-        final ProtocolCodec codec = this.codec;
-        ByteBuf             dst   = codec.getPlainReadBuf(eventLoop, ch);
-        for (; ; ) {
-            codec.readPlainRemain(ch, dst);
-            if (!read_data(dst)) {
-                return;
-            }
-            accept(dst);
-            // for epoll et mode
-            if (dst.hasWritableBytes()) {
-                break;
-            }
-        }
-    }
-
-    private void read_ssl() throws Exception {
-        ByteBuf src = eventLoop.getReadBuf();
-        for (; ; ) {
-            src.clear();
-            read_ssl_remain(src);
-            if (!read_data(src)) {
-                return;
-            }
-            for (; ; ) {
-                if (isEnoughSslUnwrap(src)) {
-                    ByteBuf res = unwrap(src);
-                    if (res != null) {
-                        accept(res);
-                    }
-                    src.resetWriteIndex();
-                    if (!src.hasReadableBytes()) {
-                        break;
-                    }
-                } else {
-                    if (src.hasReadableBytes()) {
-                        slice_remain_ssl(src);
-                    }
-                    break;
-                }
-            }
-            // for epoll et mode
-            if (src.hasWritableBytes()) {
-                break;
-            }
-        }
-    }
-
-    private boolean read_data(ByteBuf dst) {
-        int len = native_read(dst);
-        if (len < 1) {
-            if (len == -1) {
-                Util.close(this);
-                return false;
-            }
-            store_remain(dst);
-            return false;
-        }
-        dst.skipWrite(len);
-        return true;
-    }
-
-    private void store_remain(ByteBuf src) {
-        if (src.hasReadableBytes()) {
-            if (enable_ssl) {
-                slice_remain_ssl(src);
-            } else {
-                codec.storePlainReadRemain(this, src);
-            }
+            codec.read_plain(this);
         }
     }
 
@@ -712,12 +470,26 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
     }
 
-    private void read_ssl_remain(ByteBuf dst) {
+    protected void read_ssl_remain(ByteBuf dst) {
         ByteBuf remain = this.ssl_remain_buf;
         if (remain != null) {
             dst.writeBytes(remain);
             remain.release();
             this.ssl_remain_buf = null;
+        }
+    }
+
+    protected void store_plain_remain(ByteBuf src) {
+        //ensure the channel is open, otherwise the buf will never be released if the channel closed
+        if (src.hasReadableBytes() && isOpen()) {
+            plain_remain_buf = slice_remain(src);
+        }
+    }
+
+    protected void store_ssl_remain(ByteBuf src) {
+        //ensure the channel is open, otherwise the buf will never be released if the channel closed
+        if (src.hasReadableBytes() && isOpen()) {
+            ssl_remain_buf = slice_remain(src);
         }
     }
 
@@ -774,7 +546,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
     }
 
-    private void run_delegated_tasks(SSLEngine engine) {
+    protected void run_delegated_tasks(SSLEngine engine) {
         for (; ; ) {
             Runnable task = engine.getDelegatedTask();
             if (task == null) {
@@ -836,7 +608,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         return out;
     }
 
-    private void sync_buf(SSLEngineResult result, ByteBuf src, ByteBuf dst) {
+    protected void sync_buf(SSLEngineResult result, ByteBuf src, ByteBuf dst) {
         //FIXME 同步。。。。。
         src.reverseRead();
         dst.reverseWrite();
@@ -853,71 +625,6 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     @Override
     public String toString() {
         return desc;
-    }
-
-    private ByteBuf unwrap(ByteBuf src) throws IOException {
-        SSLEngine ssl_engine = getSSLEngine();
-        ByteBuf   dst        = FastThreadLocal.get().getSslUnwrapBuf();
-        if (ssl_handshake_finished) {
-            codec.readPlainRemain(this, dst);
-            SSLEngineResult result = ssl_engine.unwrap(src.nioReadBuffer(), dst.nioWriteBuffer());
-            if (result.getStatus() == Status.BUFFER_OVERFLOW) {
-                //why throw an exception here instead of handle it?
-                //the getSslUnwrapBuf will return an thread local buffer for unwrap,
-                //the buffer's size defined by Constants.SSL_UNWRAP_BUFFER_SIZE_KEY in System property
-                //or default value 256KB(1024 * 256), although the buffer will not occupy so much memory because
-                //one EventLoop only have one buffer,but before do unwrap, every channel maybe cached a large
-                //buffer under SSL_UNWRAP_BUFFER_SIZE,I do not think it is a good way to cached much memory in
-                //channel, it is not friendly for load much channels in one system, if you get exception here,
-                //you may need find a way to writeIndex you frame size,or cache your incomplete frame's data to
-                //file system or others way.
-                throw SSL_UNWRAP_OVER_LIMIT;
-            }
-            sync_buf(result, src, dst);
-            return dst;
-        } else {
-            for (; ; ) {
-                dst.clear();
-                SSLEngineResult result          = unwrap(ssl_engine, src, dst);
-                HandshakeStatus handshakeStatus = result.getHandshakeStatus();
-                sync_buf(result, src, dst);
-                if (handshakeStatus == HandshakeStatus.NEED_WRAP) {
-                    writeAndFlush(ByteBuf.empty());
-                    return null;
-                } else if (handshakeStatus == HandshakeStatus.NEED_TASK) {
-                    run_delegated_tasks(ssl_engine);
-                    continue;
-                } else if (handshakeStatus == HandshakeStatus.FINISHED) {
-                    finish_handshake();
-                    return null;
-                } else if (handshakeStatus == HandshakeStatus.NEED_UNWRAP) {
-                    if (src.hasReadableBytes()) {
-                        continue;
-                    }
-                    return null;
-                } else if (handshakeStatus == HandshakeStatus.NOT_HANDSHAKING) {
-                    // NOTICE: this handle may not the NOT_HANDSHAKING expected
-                    // NOT_HANDSHAKING is mean closed in wildfly-openssl.unwrap, so do not do finish_handshake
-                    // see: https://stackoverflow.com/questions/31149383/difference-between-not-handshaking-and-finished
-                    if (SSL_DEBUG) {
-                        logger.error("unwrap handle status: NOT_HANDSHAKING({})", this);
-                    }
-                    throw SSL_UNWRAP_CLOSED;
-                } else if (result.getStatus() == Status.BUFFER_OVERFLOW) {
-                    throw SSL_UNWRAP_OVER_LIMIT;
-                }
-            }
-        }
-    }
-
-    private static SSLEngineResult unwrap(SSLEngine ssl_engine, ByteBuf src, ByteBuf dst) throws SSLException {
-        try {
-            return ssl_engine.unwrap(src.nioReadBuffer(), dst.nioWriteBuffer());
-        } catch (SSLException e) {
-            logger.error(e.getMessage());
-            debugException(logger, e);
-        }
-        throw SSL_UNWRAP_EXCEPTION;
     }
 
     private ByteBuf wrap(ByteBuf src) throws IOException {
