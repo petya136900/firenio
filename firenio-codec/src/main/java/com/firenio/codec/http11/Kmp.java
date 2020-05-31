@@ -18,7 +18,7 @@ package com.firenio.codec.http11;
 import com.firenio.common.Util;
 
 //关键字：前缀，后缀，部分匹配表
-public class KMPUtil {
+public class Kmp {
 
     private char[] match_array;
 
@@ -26,7 +26,7 @@ public class KMPUtil {
 
     private String match_value;
 
-    public KMPUtil(String value) {
+    public Kmp(String value) {
         if (Util.isNullOrBlank(value)) {
             throw new IllegalArgumentException("null value");
         }
@@ -47,8 +47,8 @@ public class KMPUtil {
         String  match = "ABCAB";
         src = "AABAABAABC";
         match = "AABAABC";
-        KMPUtil kmp   = new KMPUtil(match);
-        int     find  = 0;
+        Kmp kmp  = new Kmp(match);
+        int find = 0;
         for (; ; ) {
             find = kmp.match(src, find);
             if (find == -1) {

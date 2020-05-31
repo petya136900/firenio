@@ -36,7 +36,7 @@ import com.firenio.component.Frame;
  */
 public class HttpFrame extends Frame {
 
-    static final KMPUtil KMP_BOUNDARY = new KMPUtil("boundary=");
+    static final Kmp KMP_BOUNDARY = new Kmp("boundary=");
 
     private int                 connection      = HttpConnection.KEEP_ALIVE.getId();
     private int                 contentLength;
