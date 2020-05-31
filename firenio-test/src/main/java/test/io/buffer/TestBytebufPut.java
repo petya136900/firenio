@@ -61,12 +61,10 @@ public class TestBytebufPut {
     @Test
     public void testput2() {
         ByteBuf src = ByteBuf.heap(1024);
-        src.clear();
         src.writeBytes(data.getBytes());
 
 
         ByteBuf dst = ByteBuf.direct(1024);
-        dst.clear();
         dst.writeBytes(src);
 
         v(dst);
@@ -75,12 +73,10 @@ public class TestBytebufPut {
     @Test
     public void testPut3() {
         ByteBuf src = ByteBuf.heap(1024);
-        src.clear();
         src.writeBytes(data.getBytes());
 
 
         ByteBuf dst = ByteBuf.direct(data1.length());
-        dst.clear();
         dst.writeBytes(src);
 
         v(dst);
@@ -89,12 +85,10 @@ public class TestBytebufPut {
     @Test
     public void testPut4() {
         ByteBuf src = ByteBuf.heap(1024);
-        src.clear();
         src.writeBytes("hello;hello;".getBytes());
 
 
         ByteBuf dst = ByteBuf.heap(1024);
-        dst.clear();
         dst.writeBytes(src);
 
         v(dst);
@@ -103,12 +97,10 @@ public class TestBytebufPut {
     @Test
     public void testPut5() {
         ByteBuf src = ByteBuf.heap(1024);
-        src.clear();
         src.writeBytes("hello;hello;".getBytes());
 
 
         ByteBuf dst = ByteBuf.heap(data1.length());
-        dst.clear();
         dst.writeBytes(src);
 
         v(dst);
@@ -117,12 +109,10 @@ public class TestBytebufPut {
     @Test
     public void testPut6() {
         ByteBuf src = ByteBuf.direct(1024);
-        src.clear();
         src.writeBytes("hello;hello;".getBytes());
 
 
         ByteBuf dst = ByteBuf.heap(1024);
-        dst.clear();
         dst.writeBytes(src);
 
         v(dst);
@@ -131,12 +121,10 @@ public class TestBytebufPut {
     @Test
     public void testPut7() {
         ByteBuf src = ByteBuf.direct(1024);
-        src.clear();
         src.writeBytes("hello;hello;".getBytes());
 
 
         ByteBuf dst = ByteBuf.heap(data1.length());
-        dst.clear();
         dst.writeBytes(src);
 
         v(dst);

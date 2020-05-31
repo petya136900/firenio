@@ -44,7 +44,7 @@ public abstract class ByteBuf implements Releasable {
     protected int marked_abs_read_index;
 
     public static ByteBuf direct(int cap) {
-        return wrap(Unsafe.allocateDirectByteBuffer(cap));
+        return wrap(Unsafe.allocateDirectByteBuffer(cap)).clear();
     }
 
     public static ByteBuf buffer(int cap) {
@@ -60,7 +60,7 @@ public abstract class ByteBuf implements Releasable {
     }
 
     public static ByteBuf unsafe(int cap) {
-        return new UnpooledUnsafeByteBuf(Unsafe.allocate(cap), cap);
+        return new UnpooledUnsafeByteBuf(Unsafe.allocate(cap), cap).clear();
     }
 
     public static ByteBuf wrapAuto(byte[] data) {
@@ -91,7 +91,7 @@ public abstract class ByteBuf implements Releasable {
     }
 
     public static ByteBuf heap(int cap) {
-        return wrap(new byte[cap]);
+        return wrap(new byte[cap]).clear();
     }
 
     public static ByteBuf wrap(byte[] data) {
