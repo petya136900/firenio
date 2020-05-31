@@ -15,10 +15,10 @@
  */
 package com.firenio.buffer;
 
-import java.nio.ByteBuffer;
-
 import com.firenio.common.ByteUtil;
 import com.firenio.common.Unsafe;
+
+import java.nio.ByteBuffer;
 
 abstract class HeapByteBuf extends ByteBuf {
 
@@ -346,6 +346,19 @@ abstract class HeapByteBuf extends ByteBuf {
             copy(Unsafe.address(src) + src.position(), memory, ix(index), len);
         }
         src.position(src.position() + len);
+        return len;
+    }
+
+    @Override
+    public int setBytes0(int index, long address, int len) {
+        copy(address, memory, ix(index), len);
+        return len;
+    }
+
+    @Override
+    public int writeBytes0(long address, int len) {
+        copy(address, memory, absWriteIndex(), len);
+        skipWrite(len);
         return len;
     }
 

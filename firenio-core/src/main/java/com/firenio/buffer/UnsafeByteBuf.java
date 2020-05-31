@@ -343,6 +343,19 @@ abstract class UnsafeByteBuf extends ByteBuf {
     }
 
     @Override
+    public int setBytes0(int index, long address, int len) {
+        copy(address, address() + ix(index), len);
+        return len;
+    }
+
+    @Override
+    public int writeBytes0(long address, int len) {
+        copy(address, address() + absWriteIndex(), len);
+        skipWrite(len);
+        return len;
+    }
+
+    @Override
     protected int writeBytes0(byte[] src, int offset, int length) {
         Unsafe.copyFromArray(src, offset, address() + absWriteIndex(), length);
         skipWrite(length);

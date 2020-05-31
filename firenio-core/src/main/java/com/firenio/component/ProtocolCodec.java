@@ -191,6 +191,19 @@ public abstract class ProtocolCodec {
         throw SSL_UNWRAP_EXCEPTION;
     }
 
+    protected boolean read_data_no_store(Channel ch, ByteBuf dst) {
+        int len = ch.native_read(dst);
+        if (len < 1) {
+            if (len == -1) {
+                Util.close(ch);
+                return false;
+            }
+            return false;
+        }
+        dst.skipWrite(len);
+        return true;
+    }
+
     protected boolean read_data(Channel ch, ByteBuf dst) {
         int len = ch.native_read(dst);
         if (len < 1) {
