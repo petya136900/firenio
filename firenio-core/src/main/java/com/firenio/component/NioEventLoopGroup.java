@@ -257,6 +257,11 @@ public class NioEventLoopGroup extends EventLoopGroup {
         this.enableMemoryPool = enableMemoryPool;
     }
 
+    public void setSharable(boolean sharable) {
+        checkNotRunning();
+        this.sharable = sharable;
+    }
+
     public boolean isSharable() {
         return sharable;
     }
