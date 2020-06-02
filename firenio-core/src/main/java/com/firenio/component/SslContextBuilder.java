@@ -91,7 +91,7 @@ public final class SslContextBuilder {
         try {
             ls = FileUtil.readLines(in, Util.UTF8);
         } catch (IOException e) {
-            throw new CertificateException("failed to native_read certificate input stream", e);
+            throw new CertificateException("failed to read certificate input stream", e);
         }
         return readCertificates(ls);
     }

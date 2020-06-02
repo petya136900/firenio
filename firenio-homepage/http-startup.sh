@@ -15,7 +15,7 @@ cp -u -v ../../firenio-boot/target/firenio-boot-*-SNAPSHOT.jar ../../firenio-hom
 
 cd ../../firenio-homepage
 
-kill -9 $(ps -ef | grep com.firenio.container.Bootstrap | grep -v grep | awk '{print $2}')
+kill -9 $(ps -ef | grep com.firenio.boot.Bootstrap | grep -v grep | awk '{print $2}')
 
 CLASSPATH=""
 for i in lib/*.jar; do

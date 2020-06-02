@@ -144,14 +144,14 @@ public abstract class ProtocolCodec {
                 //file system or others way.
                 throw SSL_UNWRAP_OVER_LIMIT;
             }
-            ch.sync_buf(result, src, dst);
+            ch.sync_buf(src, dst);
             return dst;
         } else {
             for (; ; ) {
                 dst.clear();
                 SSLEngineResult result          = unwrap(ssl_engine, src, dst);
                 HandshakeStatus handshakeStatus = result.getHandshakeStatus();
-                ch.sync_buf(result, src, dst);
+                ch.sync_buf(src, dst);
                 if (handshakeStatus == HandshakeStatus.NEED_WRAP) {
                     ch.writeAndFlush(ByteBuf.empty());
                     return null;
@@ -191,21 +191,21 @@ public abstract class ProtocolCodec {
         throw SSL_UNWRAP_EXCEPTION;
     }
 
-    protected boolean read_data_no_store(Channel ch, ByteBuf dst) {
-        int len = ch.native_read(dst);
+    protected int read_data_no_store(Channel ch, ByteBuf dst) {
+        int len = ch.read(dst);
         if (len < 1) {
             if (len == -1) {
                 Util.close(ch);
-                return false;
+                return -1;
             }
-            return false;
+            return 0;
         }
         dst.skipWrite(len);
-        return true;
+        return len;
     }
 
     protected boolean read_data(Channel ch, ByteBuf dst) {
-        int len = ch.native_read(dst);
+        int len = ch.read(dst);
         if (len < 1) {
             if (len == -1) {
                 Util.close(ch);

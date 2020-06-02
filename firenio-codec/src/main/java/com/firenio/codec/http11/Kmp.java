@@ -20,31 +20,29 @@ import com.firenio.common.Util;
 //关键字：前缀，后缀，部分匹配表
 public class Kmp {
 
-    private char[] match_array;
-
-    private int[] match_table;
-
-    private String match_value;
+    private int    m_len;
+    private char[] m_array;
+    private int[]  m_table;
 
     public Kmp(String value) {
         if (Util.isNullOrBlank(value)) {
             throw new IllegalArgumentException("null value");
         }
-        this.match_value = value;
-        this.match_array = match_value.toCharArray();
-        this.match_table = new int[match_value.length() - 1];
-        int length = this.match_value.length() - 1;
+        this.m_len = value.length();
+        this.m_array = value.toCharArray();
+        this.m_table = new int[value.length() - 1];
+        int length = value.length() - 1;
         // 只需要计算长度减一位的部分匹配表，因为最后一位如果也匹配整个字符串就匹配了
         // 直接从第二位开始比较
         for (int i = 1; i < length; i++) {
-            match_table[i] = init_table(value, i + 1);
+            m_table[i] = init_table(value, i + 1);
         }
     }
 
     public static void main(String[] args) {
 
-        String  src   = "ABC ABCA ABCABA";
-        String  match = "ABCAB";
+        String src   = "ABC ABCA ABCABA";
+        String match = "ABCAB";
         src = "AABAABAABC";
         match = "AABAABC";
         Kmp kmp  = new Kmp(match);
@@ -80,30 +78,52 @@ public class Kmp {
     }
 
     public int match(String value, int offset) {
-        if (value.length() - offset < match_array.length) {
+        if (value.length() - offset < m_len) {
             return -1;
         }
-        int    src_length   = value.length();
-        int    mat_index    = 0;
-        int    src_index    = offset;
-        int    match_length = this.match_array.length;
-        char[] match_array  = this.match_array;
-        int[]  match_table  = this.match_table;
-        for (; src_index < src_length; ) {
-            char s_c = value.charAt(src_index);
-            char m_c = match_array[mat_index];
+        int    s_len    = value.length();
+        int    m_index  = 0;
+        int    s_index  = offset;
+        int    m_len    = this.m_len;
+        char[] m_array  = this.m_array;
+        int[]  m_table  = this.m_table;
+        int    s_len_s1 = s_len - m_len;
+        for (; s_index < s_len_s1; ) {
+            char s_c = value.charAt(s_index);
+            char m_c = m_array[m_index];
             if (s_c == m_c) {
-                mat_index++;
-                src_index++;
-                if (mat_index == match_length) {
-                    return src_index - match_length;
+                m_index++;
+                s_index++;
+                if (m_index == m_len) {
+                    return s_index - m_len;
                 }
             } else {
-                if (mat_index == 0) {
-                    src_index++;
+                if (m_index == 0) {
+                    s_index++;
                 } else {
                     // 第mat_index位不匹配，查找这以前的匹配情况（-1）
-                    mat_index = match_table[mat_index - 1];
+                    m_index = m_table[m_index - 1];
+                }
+            }
+        }
+        for (; s_index < s_len; ) {
+            char s_c = value.charAt(s_index);
+            char m_c = m_array[m_index];
+            if (s_c == m_c) {
+                m_index++;
+                s_index++;
+                if (m_index == m_len) {
+                    return s_index - m_len;
+                }
+            } else {
+                if (m_index == 0) {
+                    s_index++;
+                } else {
+                    // 第mat_index位不匹配，查找这以前的匹配情况（-1）
+                    m_index = m_table[m_index - 1];
+                }
+                if (s_len - s_index < m_len - m_index) {
+                    break;
                 }
             }
         }

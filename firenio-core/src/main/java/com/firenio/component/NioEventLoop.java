@@ -41,9 +41,6 @@ import com.firenio.Options;
 import com.firenio.buffer.ByteBuf;
 import com.firenio.buffer.ByteBufAllocator;
 import com.firenio.collection.ArrayListStack;
-import com.firenio.collection.AttributeKey;
-import com.firenio.collection.AttributeMap;
-import com.firenio.collection.AttributeMap.AttributeInitFunction;
 import com.firenio.collection.DelayedQueue;
 import com.firenio.collection.IntArray;
 import com.firenio.collection.IntMap;
@@ -56,10 +53,10 @@ import com.firenio.component.Channel.EpollChannel;
 import com.firenio.component.Channel.JavaChannel;
 import com.firenio.component.ChannelConnector.EpollConnectorUnsafe;
 import com.firenio.component.ChannelConnector.JavaConnectorUnsafe;
+import com.firenio.concurrent.AtomicArray;
 import com.firenio.concurrent.EventLoop;
 import com.firenio.log.Logger;
 import com.firenio.log.LoggerFactory;
-
 import static com.firenio.Develop.debugException;
 
 /**
@@ -67,24 +64,25 @@ import static com.firenio.Develop.debugException;
  */
 public abstract class NioEventLoop extends EventLoop {
 
-    static final boolean     CHANNEL_READ_FIRST = Options.isChannelReadFirst();
-    static final Logger      logger             = NEW_LOGGER();
-    static final IOException NOT_FINISH_CONNECT = NOT_FINISH_CONNECT();
-    static final IOException OVER_CH_SIZE_LIMIT = OVER_CH_SIZE_LIMIT();
+    static final boolean       CHANNEL_READ_FIRST = Options.isChannelReadFirst();
+    static final Logger        logger             = NEW_LOGGER();
+    static final IOException   NOT_FINISH_CONNECT = NOT_FINISH_CONNECT();
+    static final IOException   OVER_CH_SIZE_LIMIT = OVER_CH_SIZE_LIMIT();
+    static final AtomicInteger ATTRIBUTE_KEYS     = new AtomicInteger();
     // NOTICE USE_HAS_TASK can make a memory barrier for io thread,
     // please do not change this value to false unless you are really need.
     // I am not sure if the select()/select(n) has memory barrier,
     // it can be set USE_HAS_TASK to false if there is a memory barrier.
-    static final boolean     USE_HAS_TASK       = true;
+    static final boolean       USE_HAS_TASK       = true;
 
     final    ByteBufAllocator        alloc;
     final    ByteBuf                 buf;
-    final    AttributeMap            attributeMap   = new NioEventLoopAttributeMap();
     final    IntMap<Channel>         channels       = new IntMap<>(4096);
     final    IntArray                close_channels = new IntArray();
     final    int                     ch_size_limit;
     final    DelayedQueue            delayed_queue  = new DelayedQueue();
     final    BlockingQueue<Runnable> events         = new LinkedBlockingQueue<>();
+    final    AtomicArray             attributes     = new AtomicArray();
     final    NioEventLoopGroup       group;
     final    int                     index;
     final    AtomicInteger           selecting      = new AtomicInteger();
@@ -179,6 +177,10 @@ public abstract class NioEventLoop extends EventLoop {
         logger.error(ex);
     }
 
+    public static int nextAttributeKey() {
+        return ATTRIBUTE_KEYS.getAndIncrement();
+    }
+
     public ByteBufAllocator alloc() {
         return alloc;
     }
@@ -207,15 +209,11 @@ public abstract class NioEventLoop extends EventLoop {
         return buf_address;
     }
 
-    public <T> T getAttribute(AttributeKey<T> key) {
-        return attributeMap.getAttribute(key);
-    }
-
     public Channel getChannel(int channelId) {
         return channels.get(channelId);
     }
 
-    private Stack<Object> get_cache0(AttributeKey<Stack<Object>> key, int max) {
+    private Stack<Object> get_cache0(int key, int max) {
         Stack<Object> cache = getAttribute(key);
         if (cache == null) {
             if (group.isConcurrentFrameStack()) {
@@ -228,7 +226,7 @@ public abstract class NioEventLoop extends EventLoop {
         return cache;
     }
 
-    public Object getCache(AttributeKey<Stack<Object>> key, int max) {
+    public Object getCache(int key, int max) {
         return get_cache0(key, max).pop();
     }
 
@@ -254,15 +252,19 @@ public abstract class NioEventLoop extends EventLoop {
         return group.nextChannelId();
     }
 
-    public void release(AttributeKey<Stack<Object>> key, Object obj) {
+    public void release(int key, Object obj) {
         Stack<Object> buffer = getAttribute(key);
         if (buffer != null) {
             buffer.push(obj);
         }
     }
 
-    public AttributeMap getAttributeMap() {
-        return attributeMap;
+    public <T> T getAttribute(int key) {
+        return (T) attributes.get(key);
+    }
+
+    public void setAttribute(int key, Object value) {
+        attributes.set(key, value);
     }
 
     protected void removeChannel(int id) {
@@ -438,10 +440,6 @@ public abstract class NioEventLoop extends EventLoop {
         }
     }
 
-    public void setAttribute(AttributeKey key, Object value) {
-        this.attributeMap.setAttribute(key, value);
-    }
-
     public boolean submit(Runnable event) {
         if (super.submit(event)) {
             wakeup();
@@ -477,14 +475,6 @@ public abstract class NioEventLoop extends EventLoop {
     abstract int select_now();
 
     abstract void wakeup0();
-
-    public static AttributeKey valueOfKey(String name) {
-        return AttributeMap.valueOfKey(NioEventLoop.class, name);
-    }
-
-    public static AttributeKey valueOfKey(String name, AttributeInitFunction function) {
-        return AttributeMap.valueOfKey(NioEventLoop.class, name, function);
-    }
 
     static final class JavaEventLoop extends NioEventLoop {
 
@@ -1054,15 +1044,6 @@ public abstract class NioEventLoop extends EventLoop {
         @Override
         void wakeup0() {
             Native.event_fd_write(event_fd, 1L);
-        }
-
-    }
-
-    static class NioEventLoopAttributeMap extends AttributeMap {
-
-        @Override
-        protected AttributeKeys getKeys() {
-            return getKeys(NioEventLoop.class);
         }
 
     }

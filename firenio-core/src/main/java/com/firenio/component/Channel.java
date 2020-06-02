@@ -23,11 +23,14 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
-
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
@@ -38,8 +41,6 @@ import com.firenio.Develop;
 import com.firenio.Releasable;
 import com.firenio.buffer.ByteBuf;
 import com.firenio.buffer.ByteBufAllocator;
-import com.firenio.collection.AttributeKey;
-import com.firenio.collection.AttributeMap;
 import com.firenio.common.Unsafe;
 import com.firenio.common.Util;
 import com.firenio.component.NioEventLoop.EpollEventLoop;
@@ -47,7 +48,6 @@ import com.firenio.component.NioEventLoop.JavaEventLoop;
 import com.firenio.concurrent.EventLoop;
 import com.firenio.log.Logger;
 import com.firenio.log.LoggerFactory;
-
 import static com.firenio.Develop.debugException;
 import static com.firenio.common.Util.unknownStackTrace;
 
@@ -59,7 +59,7 @@ import static com.firenio.common.Util.unknownStackTrace;
  * otherwise you can call writeAndFlush instead of write(...) ... flush.
  */
 //请勿使用remote.getRemoteHost(),可能出现阻塞
-public abstract class Channel extends AttributeMap implements Runnable, AutoCloseable {
+public abstract class Channel implements Runnable, AutoCloseable {
 
     static final Logger                          logger                     = NEW_LOGGER();
     static final long                            PENDING_WRITE_SIZE_OFFSET  = Unsafe.fieldOffset(Channel.class, "pending_write_size");
@@ -69,32 +69,34 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     public static final IOException  SSL_HANDSHAKE_FAILED = SSL_HANDSHAKE_FAILED();
     public static final SSLException SSL_WRAP_CLOSED      = SSL_WRAP_CLOSED();
 
-    protected final    ChannelContext context;
-    protected final    long           creation_time = Util.now();
-    protected final    ByteBuf[]      current_wbs;
-    protected final    String         desc;
-    protected final    boolean        enable_ssl;
-    protected final    NioEventLoop   eventLoop;
-    protected final    EventLoop      exec_el;
-    protected final    SSLEngine      ssl_engine;
-    protected final    Queue<ByteBuf> write_bufs;
-    protected final    IoEventHandle  ioEventHandle;
-    protected final    int            channelId;
-    protected final    short          localPort;
-    protected final    String         remoteAddr;
-    protected final    short          remotePort;
-    protected final    long           max_pending_write_size;
-    protected          Object         attachment;
-    protected          ProtocolCodec  codec;
-    protected          byte           current_wbs_len;
-    protected          boolean        in_event;
-    protected          long           last_access;
-    protected volatile boolean        open          = true;
-    protected volatile long           pending_write_size;
-    protected          ByteBuf        plain_remain_buf;
-    protected          boolean        ssl_handshake_finished;
-    protected          ByteBuf        ssl_remain_buf;
-    protected          byte           ssl_wrap_ext;
+    protected final    ChannelContext      context;
+    protected final    long                creation_time = Util.now();
+    protected final    ByteBuf[]           current_wbs;
+    protected final    String              desc;
+    protected final    boolean             enable_ssl;
+    protected final    NioEventLoop        eventLoop;
+    protected final    EventLoop           exec_el;
+    protected final    SSLEngine           ssl_engine;
+    protected final    Queue<ByteBuf>      write_bufs;
+    protected final    IoEventHandle       ioEventHandle;
+    protected final    int                 channelId;
+    protected final    short               localPort;
+    protected final    String              remoteAddr;
+    protected final    short               remotePort;
+    protected final    long                max_pending_write_size;
+    protected          Object              attachment;
+    protected          Map<String, Object> attributes;
+    protected          ProtocolCodec       codec;
+    protected          byte                current_wbs_len;
+    protected          boolean             in_event;
+    protected          boolean             interestWrite;
+    protected          long                last_access;
+    protected volatile boolean             open          = true;
+    protected volatile long                pending_write_size;
+    protected          ByteBuf             plain_remain_buf;
+    protected          boolean             ssl_handshake_finished;
+    protected          ByteBuf             ssl_remain_buf;
+    protected          byte                ssl_wrap_ext;
 
     Channel(NioEventLoop el, ChannelContext ctx, String ra, int lp, int rp, Integer id) {
         this.remoteAddr = ra;
@@ -143,14 +145,6 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
 
     private static AtomicLongFieldUpdater<Channel> PENDING_WRITE_SIZE_UPDATER() {
         return AtomicLongFieldUpdater.newUpdater(Channel.class, "pending_write_size");
-    }
-
-    public static AttributeKey valueOfKey(String name) {
-        return AttributeMap.valueOfKey(Channel.class, name);
-    }
-
-    public static AttributeKey valueOfKey(String name, AttributeInitFunction function) {
-        return AttributeMap.valueOfKey(Channel.class, name, function);
     }
 
     /**
@@ -540,7 +534,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
     public void run() {
         if (isOpen()) {
             in_event = false;
-            if (!isInterestWrite() && write() == -1) {
+            if (!interestWrite && write() == -1) {
                 safe_close();
             }
         }
@@ -608,7 +602,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         return out;
     }
 
-    protected void sync_buf(SSLEngineResult result, ByteBuf src, ByteBuf dst) {
+    protected void sync_buf(ByteBuf src, ByteBuf dst) {
         //FIXME 同步。。。。。
         src.reverseRead();
         dst.reverseWrite();
@@ -643,7 +637,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
                 for (; ; ) {
                     SSLEngineResult result = engine.wrap(src.nioReadBuffer(), out.nioWriteBuffer());
                     Status          status = result.getStatus();
-                    sync_buf(result, src, out);
+                    sync_buf(src, out);
                     if (status == Status.CLOSED) {
                         return out;
                     } else if (status == Status.BUFFER_OVERFLOW) {
@@ -670,7 +664,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
                     SSLEngineResult result          = engine.wrap(src.nioReadBuffer(), dst.nioWriteBuffer());
                     Status          status          = result.getStatus();
                     HandshakeStatus handshakeStatus = result.getHandshakeStatus();
-                    sync_buf(result, src, dst);
+                    sync_buf(src, dst);
                     if (status == Status.CLOSED) {
                         return swap(alloc, dst);
                     }
@@ -752,8 +746,38 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         write(codec.encode(this, frame));
     }
 
-    //1 complete, 0 keep write, -1 close
-    abstract int write();
+    /**
+     * Not safe API, DO NOT USE this unless you are really know how to use this.
+     *
+     * @return 1 complete, 0 keep write, -1 close
+     */
+    public abstract int write();
+
+    public <T> T getAttribute(String key) {
+        if (attributes == null) {
+            return null;
+        }
+        return (T) attributes.get(key);
+    }
+
+    public <T> T setAttribute(String key, T value) {
+        if (attributes == null) {
+            synchronized (this) {
+                //isOpen is used to set memory barrier
+                if (isOpen() && attributes == null) {
+                    attributes = new ConcurrentHashMap<>();
+                }
+            }
+        }
+        return (T) attributes.put(key, value);
+    }
+
+    public Set<String> getAttributeKeys() {
+        if (attributes == null) {
+            return null;
+        }
+        return attributes.keySet();
+    }
 
     public void writeAndFlush(ByteBuf buf) {
         write(buf);
@@ -773,20 +797,17 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
     }
 
-    @Override
-    protected AttributeKeys getKeys() {
-        return getKeys(Channel.class);
-    }
-
-    abstract boolean isInterestWrite();
-
-    abstract int native_read(ByteBuf dst);
+    /**
+     * Not safe API, DO NOT USE this unless you are really know how to use this.
+     *
+     * @return read len, -1 EOF
+     */
+    public abstract int read(ByteBuf dst);
 
     static final class EpollChannel extends Channel {
 
-        private final int     epfd;
-        private final int     fd;
-        private       boolean interestWrite;
+        private final int epfd;
+        private final int fd;
 
         EpollChannel(NioEventLoop el, ChannelContext ctx, int epfd, int fd, String ra, int lp, int rp, Integer id) {
             super(el, ctx, ra, lp, rp, id);
@@ -813,12 +834,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
 
         @Override
-        boolean isInterestWrite() {
-            return interestWrite;
-        }
-
-        @Override
-        int native_read(ByteBuf dst) {
+        public int read(ByteBuf dst) {
             long address = dst.address() + dst.absWriteIndex();
             return Native.read(fd, address, dst.writableBytes());
         }
@@ -829,7 +845,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
 
         @Override
-        int write() {
+        public int write() {
             final EpollEventLoop el        = (EpollEventLoop) eventLoop;
             final int            fd        = this.fd;
             final ByteBuf[]      cwb_array = this.current_wbs;
@@ -916,20 +932,15 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
 
     static final class JavaChannel extends Channel {
 
-        static final int INTEREST_WRITE = INTEREST_WRITE();
+        static final int INTEREST_WRITE = SelectionKey.OP_READ | SelectionKey.OP_WRITE;
 
         private final SocketChannel channel;
         private final SelectionKey  key;
-        private       boolean       interestWrite;
 
         JavaChannel(NioEventLoop el, ChannelContext ctx, SelectionKey key, String ra, int lp, int rp, Integer id) {
             super(el, ctx, ra, lp, rp, id);
             this.key = key;
             this.channel = (SocketChannel) key.channel();
-        }
-
-        private static int INTEREST_WRITE() {
-            return SelectionKey.OP_READ | SelectionKey.OP_WRITE;
         }
 
         private void interestRead() {
@@ -975,11 +986,6 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
             return -1;
         }
 
-        @Override
-        boolean isInterestWrite() {
-            return interestWrite;
-        }
-
         private int native_write(ByteBuffer src) {
             try {
                 return channel.write(src);
@@ -997,7 +1003,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
 
         @Override
-        int native_read(ByteBuf dst) {
+        public int read(ByteBuf dst) {
             try {
                 return channel.read(dst.nioWriteBuffer());
             } catch (Throwable e) {
@@ -1018,7 +1024,7 @@ public abstract class Channel extends AttributeMap implements Runnable, AutoClos
         }
 
         @Override
-        int write() {
+        public int write() {
             final ByteBuf[]      cwb_array   = this.current_wbs;
             final Queue<ByteBuf> wb_queue    = this.write_bufs;
             final JavaEventLoop  el          = (JavaEventLoop) eventLoop;

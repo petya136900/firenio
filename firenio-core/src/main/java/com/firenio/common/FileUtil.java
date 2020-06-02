@@ -236,7 +236,7 @@ public class FileUtil {
                 throw new IOException("File '" + file + "' exists but is a directory");
             }
             if (!file.canRead()) {
-                throw new IOException("File '" + file + "' cannot be native_read");
+                throw new IOException("File '" + file + "' cannot be read");
             }
         } else {
             throw new FileNotFoundException("File '" + file + "' does not exist");

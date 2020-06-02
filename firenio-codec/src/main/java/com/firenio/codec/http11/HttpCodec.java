@@ -22,10 +22,8 @@ import java.util.Map;
 
 import com.firenio.Develop;
 import com.firenio.buffer.ByteBuf;
-import com.firenio.collection.AttributeKey;
 import com.firenio.collection.ByteTree;
 import com.firenio.collection.IntMap;
-import com.firenio.collection.Stack;
 import com.firenio.common.ByteUtil;
 import com.firenio.common.Util;
 import com.firenio.component.Channel;
@@ -39,20 +37,20 @@ import com.firenio.component.ProtocolCodec;
  */
 public class HttpCodec extends ProtocolCodec {
 
-    protected static final byte[]                      CONTENT_LENGTH_MATCH  = ByteUtil.b("Content-Length:");
-    protected static final int                         decode_state_body     = 2;
-    protected static final int                         decode_state_complete = 3;
-    protected static final int                         decode_state_header   = 1;
-    protected static final int                         decode_state_line_one = 0;
-    protected static final AttributeKey<Stack<Object>> FRAME_CACHE_KEY       = NioEventLoop.valueOfKey("http_frame_cache_key");
-    protected static final byte                        N                     = '\n';
-    protected static final IOException                 OVER_LIMIT            = EXCEPTION("over writeIndex");
-    protected static final IOException                 ILLEGAL_METHOD        = EXCEPTION("illegal http method");
-    protected static final byte                        R                     = '\r';
-    protected static final byte                        SPACE                 = ' ';
-    protected static final int                         NUM_GET               = ByteUtil.getIntLE("GET ".getBytes(), 0);
-    protected static final int                         NUM_POST              = ByteUtil.getIntLE("POST".getBytes(), 0);
-    protected static final int                         NUM_HEAD              = ByteUtil.getIntLE("HEAD ".getBytes(), 0);
+    protected static final byte[]      CONTENT_LENGTH_MATCH  = ByteUtil.b("Content-Length:");
+    protected static final int         decode_state_body     = 2;
+    protected static final int         decode_state_complete = 3;
+    protected static final int         decode_state_header   = 1;
+    protected static final int         decode_state_line_one = 0;
+    protected static final int         FRAME_CACHE_KEY       = NioEventLoop.nextAttributeKey();
+    protected static final byte        N                     = '\n';
+    protected static final IOException OVER_LIMIT            = EXCEPTION("over writeIndex");
+    protected static final IOException ILLEGAL_METHOD        = EXCEPTION("illegal http method");
+    protected static final byte        R                     = '\r';
+    protected static final byte        SPACE                 = ' ';
+    protected static final int         NUM_GET               = ByteUtil.getIntLE("GET ".getBytes(), 0);
+    protected static final int         NUM_POST              = ByteUtil.getIntLE("POST".getBytes(), 0);
+    protected static final int         NUM_HEAD              = ByteUtil.getIntLE("HEAD ".getBytes(), 0);
 
     protected final int        blimit;
     protected final byte[][]   cl_bytes = new byte[1024][];
