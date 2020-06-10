@@ -48,6 +48,7 @@ import com.firenio.component.NioEventLoop.JavaEventLoop;
 import com.firenio.concurrent.EventLoop;
 import com.firenio.log.Logger;
 import com.firenio.log.LoggerFactory;
+
 import static com.firenio.Develop.debugException;
 import static com.firenio.common.Util.unknownStackTrace;
 
@@ -764,7 +765,8 @@ public abstract class Channel implements Runnable, AutoCloseable {
         if (attributes == null) {
             synchronized (this) {
                 //isOpen is used to set memory barrier
-                if (isOpen() && attributes == null) {
+                isOpen();
+                if (attributes == null) {
                     attributes = new ConcurrentHashMap<>();
                 }
             }

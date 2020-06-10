@@ -37,15 +37,15 @@ public final class FastThreadLocal {
     static final AtomicInteger                ATTRIBUTE_KEYS    = new AtomicInteger();
     static final ThreadLocal<FastThreadLocal> SLOW_THREAD_LOCAL = new ThreadLocal<>();
 
-    private byte[]                       bytes32         = new byte[32];
-    private Map<Charset, CharsetDecoder> charsetDecoders = new IdentityHashMap<>();
-    private Map<Charset, CharsetEncoder> charsetEncoders = new IdentityHashMap<>();
-    private ByteBuf                      sslUnwrapBuf;
     private ByteBuf                      sslWrapBuf;
+    private ByteBuf                      sslUnwrapBuf;
+    private byte[]                       bytes32         = new byte[32];
     private StringBuilder                stringBuilder   = new StringBuilder(512);
     private List<?>                      list            = new ArrayList<>();
     private Map<?, ?>                    map             = new HashMap<>();
     private Object[]                     attributes      = new Object[16];
+    private Map<Charset, CharsetDecoder> charsetDecoders = new IdentityHashMap<>();
+    private Map<Charset, CharsetEncoder> charsetEncoders = new IdentityHashMap<>();
 
     FastThreadLocal() {}
 

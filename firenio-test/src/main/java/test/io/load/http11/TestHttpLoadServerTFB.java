@@ -149,7 +149,7 @@ public class TestHttpLoadServerTFB {
                     f.setConnection(HttpConnection.NONE);
                     f.setDate(HttpDateUtil.getDateLine());
                     codec.encode(ch, buf, f);
-                    ch.release(f);
+                    codec.release(ch.getEventLoop(),f);
                 } else if ("/json".equals(action)) {
                     ByteBuf temp = FastThreadLocal.get().getAttribute(JSON_BUF);
                     if (temp == null) {
